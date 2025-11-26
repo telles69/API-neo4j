@@ -1,11 +1,9 @@
-import ClienteRoute from "./ClienteRoute.js";
-import EmprestimoRoute from "./EmprestimoRoute.js";
-import pessoaRoute from "./pessoaRoute.js";
+import UserRoute from "./userRoute.js";
+import PostRoute from "./postRoute.js";
 
 function Routes(app){
-    pessoaRoute(app)
-    ClienteRoute(app)
-    EmprestimoRoute(app)
+    UserRoute(app);
+    PostRoute(app);
 }
 
 export default Routes;

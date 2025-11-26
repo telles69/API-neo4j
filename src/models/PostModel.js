@@ -1,23 +1,14 @@
 import { ModelFactory } from 'neogma';
 import getNeogma from '../config/neogma.js';
 
-const clienteSchema = {
-    label: 'Cliente',
+const postSchema = {
+    label: 'Post',
     schema: {
         id: {
-            type: 'integer',
-            required: true,
-        },
-        nome: {
             type: 'string',
             required: true,
         },
-        cpf: {
-            type: 'string',
-            required: true,
-            unique: true,
-        },
-        dataNascimento: {
+        content: {
             type: 'string',
             required: true,
         },
@@ -31,14 +22,26 @@ const clienteSchema = {
         },
     },
     relationships: {
-        emprestiimos: {
-            model: 'Emprestimo',
+        author: {
+            model: 'User',
             direction: 'in',
-            name: 'EMPRESTADO_PARA',
+            name: 'POSTED',
         },
+        likedBy: {
+            model: 'User',
+            direction: 'in',
+            name: 'LIKES',
+        },
+        comments: {
+            model: 'Comment',
+            direction: 'in',
+            name: 'ON',
+        }
     },
 };
 
-const Cliente = ModelFactory(clienteSchema, getNeogma());
+const Post = ModelFactory(postSchema, getNeogma());
 
-export default Cliente;
+getNeogma().modelsByName['Post'] = Post;
+
+export default Post;
