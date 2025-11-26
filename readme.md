@@ -7,12 +7,10 @@ npm install
 
 ## Coloque no .env
 ```js
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=neo4jteste
 API_PORT=3333
-POSTGRES_DB=pessoas
-POSTGRES_USERNAME=postgres
-POSTGRES_PASSWORD=kk
-POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
 ```
 
 ## Rode
