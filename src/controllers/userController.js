@@ -148,11 +148,42 @@ const getRecommendations = async (req, res) => {
     }
 };
 
+// Posts de um usuário específico com contagens de likes e comentários
+const getUserPosts = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const neogma = getNeogma();
+        const result = await neogma.queryRunner.run(
+            `MATCH (u:User {id: $id})-[:POSTED]->(p:Post)
+             OPTIONAL MATCH (p)<-[:LIKES]-(lu:User)
+             OPTIONAL MATCH (p)<-[:ON]-(cm:Comment)
+             RETURN p.id AS id, p.content AS content, p.createdAt AS createdAt, u.username AS author,
+                    count(DISTINCT lu) AS likes, count(DISTINCT cm) AS comments
+             ORDER BY createdAt DESC`,
+            { id }
+        );
+
+        const posts = result.records.map(r => ({
+            id: r.get('id'),
+            content: r.get('content'),
+            createdAt: r.get('createdAt'),
+            author: r.get('author'),
+            likes: r.get('likes')?.toNumber?.() ?? r.get('likes'),
+            comments: r.get('comments')?.toNumber?.() ?? r.get('comments'),
+        }));
+
+        return res.status(200).send({ message: 'Posts do usuário', data: posts });
+    } catch (error) {
+        return res.status(500).send({ message: error.message });
+    }
+};
+
 export default {
     create,
     getProfile,
     getAll,
     followUser,
     unfollowUser,
-    getRecommendations
+    getRecommendations,
+    getUserPosts
 };

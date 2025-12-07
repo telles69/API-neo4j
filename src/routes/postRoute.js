@@ -7,4 +7,5 @@ export default (app) => {
     app.post('/posts/:id/like', postController.likePost);
     app.get('/feed', postController.getFeed);
     app.post('/posts/:id/comments', postController.createComment);
+    app.get('/posts/:id/comments', postController.getComments);
 }

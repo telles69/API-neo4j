@@ -108,31 +108,65 @@ const likePost = async (req, res) => {
 
 const getFeed = async (req, res) => {
     try {
-        const { userId } = req.query; // Passar userId como query param para simplificar
+        const { userId } = req.query;
 
         if (!userId) {
             return res.status(400).send({ message: 'userId é obrigatório na query' });
         }
 
         const neogma = getNeogma();
-        const result = await neogma.queryRunner.run(
-            `MATCH (me:User {id: $userId})-[:FOLLOWS]->(friend:User)-[:POSTED]->(post:Post)
-             RETURN post.id as id, post.content as content, post.createdAt as createdAt, friend.username as author
-             ORDER BY post.createdAt DESC
-             LIMIT 20`,
-            { userId }
-        );
 
-        const feed = result.records.map(record => ({
+        // Posts do próprio usuário + dos que ele segue
+                 const postsResult = await neogma.queryRunner.run(
+                     `CALL {
+                     WITH $userId AS uid
+                     MATCH (me:User {id: uid})-[:POSTED]->(p:Post)
+                     OPTIONAL MATCH (p)<-[:LIKES]-(lu:User)
+                     OPTIONAL MATCH (p)<-[:ON]-(cm:Comment)
+                     RETURN p.id AS id, p.content AS content, p.createdAt AS createdAt, me.username AS author,
+                         count(DISTINCT lu) AS likes, count(DISTINCT cm) AS comments
+                     UNION
+                     WITH $userId AS uid
+                     MATCH (me:User {id: uid})-[:FOLLOWS]->(friend:User)-[:POSTED]->(fp:Post)
+                     OPTIONAL MATCH (fp)<-[:LIKES]-(lu2:User)
+                     OPTIONAL MATCH (fp)<-[:ON]-(cm2:Comment)
+                     RETURN fp.id AS id, fp.content AS content, fp.createdAt AS createdAt, friend.username AS author,
+                         count(DISTINCT lu2) AS likes, count(DISTINCT cm2) AS comments
+                      }
+                      RETURN id, content, createdAt, author, likes, comments
+                      ORDER BY createdAt DESC
+                      LIMIT 50`,
+                     { userId }
+                 );
+
+        const feed = postsResult.records.map(record => ({
             id: record.get('id'),
             content: record.get('content'),
             createdAt: record.get('createdAt'),
-            author: record.get('author')
+            author: record.get('author'),
+            likes: record.get('likes')?.toNumber?.() ?? record.get('likes'),
+            comments: record.get('comments')?.toNumber?.() ?? record.get('comments')
+        }));
+
+        // Sugestões de pessoas para seguir: usuários que não são o próprio e que o usuário ainda não segue
+        const suggestionsResult = await neogma.queryRunner.run(
+            `MATCH (u:User)
+             WHERE u.id <> $userId
+             AND NOT EXISTS { MATCH (:User {id: $userId})-[:FOLLOWS]->(u) }
+             RETURN u.id AS id, u.username AS username
+             LIMIT 10`,
+            { userId }
+        );
+
+        const suggestions = suggestionsResult.records.map(r => ({
+            id: r.get('id'),
+            username: r.get('username')
         }));
 
         return res.status(200).send({
             message: 'Feed de notícias',
-            data: feed
+            data: feed,
+            suggestions
         });
     } catch (error) {
         return res.status(500).send({ message: error.message });
@@ -141,7 +175,7 @@ const getFeed = async (req, res) => {
 
 const createComment = async (req, res) => {
     try {
-        const { postId } = req.params;
+        const { id: postId } = req.params;
         const { text, userId } = req.body;
 
         if (!text || !userId) {
@@ -172,11 +206,42 @@ const createComment = async (req, res) => {
     }
 };
 
+const getComments = async (req, res) => {
+    try {
+        const { id: postId } = req.params;
+
+        const neogma = getNeogma();
+        const result = await neogma.queryRunner.run(
+            `MATCH (p:Post {id: $postId})
+             MATCH (c:Comment)-[:ON]->(p)
+             OPTIONAL MATCH (u:User)-[:WROTE]->(c)
+             RETURN c.id AS id, c.text AS text, c.createdAt AS createdAt, u.username AS author
+             ORDER BY createdAt ASC`,
+            { postId }
+        );
+
+        const comments = result.records.map(r => ({
+            id: r.get('id'),
+            text: r.get('text'),
+            createdAt: r.get('createdAt'),
+            author: r.get('author') || 'Anônimo'
+        }));
+
+        return res.status(200).send({
+            message: 'Comentários do post',
+            data: comments
+        });
+    } catch (error) {
+        return res.status(500).send({ message: error.message });
+    }
+};
+
 export default {
     createPost,
     getPost,
     getAll,
     likePost,
     getFeed,
-    createComment
+    createComment,
+    getComments
 };
