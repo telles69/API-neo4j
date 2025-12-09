@@ -176,10 +176,16 @@ const getFeed = async (req, res) => {
 const createComment = async (req, res) => {
     try {
         const { id: postId } = req.params;
-        const { text, userId } = req.body;
+        const { text, content, userId } = req.body;
 
-        if (!text || !userId) {
-            return res.status(400).send({ message: 'Texto e userId são obrigatórios' });
+        const commentText = (typeof text === 'string' && text.trim())
+            ? text.trim()
+            : (typeof content === 'string' && content.trim())
+            ? content.trim()
+            : '';
+
+        if (!commentText || !userId) {
+            return res.status(400).send({ message: 'Texto (text/content) e userId são obrigatórios' });
         }
 
         const neogma = getNeogma();
@@ -194,12 +200,12 @@ const createComment = async (req, res) => {
              CREATE (u)-[:WROTE]->(c)
              CREATE (c)-[:ON]->(p)
              RETURN c`,
-            { userId, postId, id, text, now }
+            { userId, postId, id, text: commentText, now }
         );
 
         return res.status(201).send({
             message: 'Comentário criado',
-            data: { id, text, createdAt: now }
+            data: { id, content: commentText, createdAt: now }
         });
     } catch (error) {
         return res.status(500).send({ message: error.message });
@@ -215,14 +221,14 @@ const getComments = async (req, res) => {
             `MATCH (p:Post {id: $postId})
              MATCH (c:Comment)-[:ON]->(p)
              OPTIONAL MATCH (u:User)-[:WROTE]->(c)
-             RETURN c.id AS id, c.text AS text, c.createdAt AS createdAt, u.username AS author
+             RETURN c.id AS id, c.text AS content, c.createdAt AS createdAt, u.username AS author
              ORDER BY createdAt ASC`,
             { postId }
         );
 
         const comments = result.records.map(r => ({
             id: r.get('id'),
-            text: r.get('text'),
+            content: r.get('content'),
             createdAt: r.get('createdAt'),
             author: r.get('author') || 'Anônimo'
         }));
