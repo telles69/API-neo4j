@@ -36,7 +36,7 @@ app.use((req, res) =>{
     res.status(404).send('404 - página não encontrada')
 });
 
-// Verificar conexão com Neo4j
+
 (async () => {
 
     try {

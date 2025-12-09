@@ -14,13 +14,13 @@ const createPost = async (req, res) => {
         const id = randomUUID();
         const now = new Date().toISOString();
 
-        // Verifica se usuário existe
+        
         const user = await User.findOne({ where: { id: userId } });
         if (!user) {
             return res.status(404).send({ message: 'Usuário não encontrado' });
         }
 
-        // Cria o post sem o relacionamento automático para evitar erro de resolução de modelo
+        
         await Post.createOne({
             id,
             content,
@@ -28,7 +28,7 @@ const createPost = async (req, res) => {
             updatedAt: now
         });
 
-        // Cria o relacionamento manualmente via Cypher
+        
         const neogma = getNeogma();
         await neogma.queryRunner.run(
             `MATCH (u:User {id: $userId}), (p:Post {id: $id})
@@ -65,10 +65,10 @@ const getPost = async (req, res) => {
 
 const getAll = async (req, res) => {
     try {
-        const { userId } = req.query; // ID do usuário logado (opcional)
+        const { userId } = req.query; 
         const neogma = getNeogma();
         
-        // Busca posts com informações do autor via relacionamento POSTED
+        
         const result = await neogma.queryRunner.run(
             `MATCH (u:User)-[:POSTED]->(p:Post)
              OPTIONAL MATCH (p)<-[:LIKES]-(lu:User)
@@ -109,7 +109,7 @@ const getAll = async (req, res) => {
 
 const likePost = async (req, res) => {
     try {
-        const { id } = req.params; // Post ID
+        const { id } = req.params; 
         const { userId } = req.body;
 
         if (!userId) {
@@ -118,7 +118,7 @@ const likePost = async (req, res) => {
 
         const neogma = getNeogma();
         
-        // Verifica existência
+        
         const post = await Post.findOne({ where: { id } });
         const user = await User.findOne({ where: { id: userId } });
 
@@ -126,7 +126,7 @@ const likePost = async (req, res) => {
             return res.status(404).send({ message: 'Post ou Usuário não encontrado' });
         }
 
-        // Verifica se já existe o relacionamento LIKES
+        
         const checkResult = await neogma.queryRunner.run(
             `MATCH (u:User {id: $userId})-[r:LIKES]->(p:Post {id: $id})
              RETURN r`,
@@ -134,7 +134,7 @@ const likePost = async (req, res) => {
         );
 
         if (checkResult.records.length > 0) {
-            // Se já curtiu, remove o like
+            
             await neogma.queryRunner.run(
                 `MATCH (u:User {id: $userId})-[r:LIKES]->(p:Post {id: $id})
                  DELETE r`,
@@ -142,7 +142,7 @@ const likePost = async (req, res) => {
             );
             return res.status(200).send({ message: 'Like removido com sucesso', liked: false });
         } else {
-            // Se não curtiu, adiciona o like
+            
             await neogma.queryRunner.run(
                 `MATCH (u:User {id: $userId}), (p:Post {id: $id})
                  MERGE (u)-[:LIKES]->(p)`,
@@ -165,7 +165,7 @@ const getFeed = async (req, res) => {
 
         const neogma = getNeogma();
 
-        // Posts do próprio usuário + dos que ele segue
+        
                  const postsResult = await neogma.queryRunner.run(
                      `CALL {
                      WITH $userId AS uid
@@ -197,7 +197,7 @@ const getFeed = async (req, res) => {
             comments: record.get('comments')?.toNumber?.() ?? record.get('comments')
         }));
 
-        // Sugestões de pessoas para seguir: usuários que não são o próprio e que o usuário ainda não segue
+        
         const suggestionsResult = await neogma.queryRunner.run(
             `MATCH (u:User)
              WHERE u.id <> $userId
@@ -241,8 +241,8 @@ const createComment = async (req, res) => {
         const id = randomUUID();
         const now = new Date().toISOString();
 
-        // Cria o comentário e os relacionamentos manualmente via Cypher para garantir a estrutura correta
-        // (User)-[:WROTE]->(Comment)-[:ON]->(Post)
+        
+        
         await neogma.queryRunner.run(
             `MATCH (u:User {id: $userId}), (p:Post {id: $postId})
              CREATE (c:Comment {id: $id, text: $text, createdAt: $now})

@@ -6,7 +6,7 @@ const create = async (req, res) => {
     try {
         const { username, email, password, bio } = req.body;
         
-        // Validação básica
+        
         if (!username || !email || !password) {
             return res.status(400).send({ message: 'Campos obrigatórios faltando' });
         }
@@ -18,7 +18,7 @@ const create = async (req, res) => {
             id,
             username,
             email,
-            password, // Em produção, use hash (bcrypt)
+            password, 
             bio: bio || '',
             createdAt: now,
             updatedAt: now
@@ -38,7 +38,7 @@ const getProfile = async (req, res) => {
         const { id } = req.params;
         const neogma = getNeogma();
         
-        // Busca usuário com contagem de seguidores e seguindo
+        
         const result = await neogma.queryRunner.run(
             `MATCH (u:User {id: $id})
              OPTIONAL MATCH (u)<-[:FOLLOWS]-(follower:User)
@@ -88,8 +88,8 @@ const getAll = async (req, res) => {
 
 const followUser = async (req, res) => {
     try {
-        const { id } = req.params; // ID do usuário a ser seguido
-        const { followerId } = req.body; // ID do usuário que está seguindo (simulado, viria do token)
+        const { id } = req.params; 
+        const { followerId } = req.body; 
 
         if (!followerId) {
             return res.status(400).send({ message: 'followerId é obrigatório no body' });
@@ -97,7 +97,7 @@ const followUser = async (req, res) => {
 
         const neogma = getNeogma();
         
-        // Verifica se ambos existem
+        
         const userToFollow = await User.findOne({ where: { id } });
         const follower = await User.findOne({ where: { id: followerId } });
 
@@ -105,7 +105,7 @@ const followUser = async (req, res) => {
             return res.status(404).send({ message: 'Usuário não encontrado' });
         }
 
-        // Cria relacionamento
+        
         await neogma.queryRunner.run(
             `MATCH (a:User {id: $followerId}), (b:User {id: $id})
              MERGE (a)-[:FOLLOWS]->(b)`,
@@ -120,8 +120,8 @@ const followUser = async (req, res) => {
 
 const unfollowUser = async (req, res) => {
     try {
-        const { id } = req.params; // ID do usuário a deixar de seguir
-        const { followerId } = req.body; // ID do usuário que está deixando de seguir
+        const { id } = req.params; 
+        const { followerId } = req.body; 
 
         if (!followerId) {
             return res.status(400).send({ message: 'followerId é obrigatório no body' });
@@ -129,7 +129,7 @@ const unfollowUser = async (req, res) => {
 
         const neogma = getNeogma();
 
-        // Deleta relacionamento
+        
         await neogma.queryRunner.run(
             `MATCH (a:User {id: $followerId})-[r:FOLLOWS]->(b:User {id: $id})
              DELETE r`,
@@ -144,12 +144,12 @@ const unfollowUser = async (req, res) => {
 
 const getRecommendations = async (req, res) => {
     try {
-        const { id } = req.params; // ID do usuário logado
+        const { id } = req.params; 
         
         const neogma = getNeogma();
         
-        // Estratégia 1: Amigos de amigos (maior peso)
-        // Usuários que seus amigos seguem mas você não segue
+        
+        
         const friendsOfFriendsResult = await neogma.queryRunner.run(
             `MATCH (me:User {id: $id})-[:FOLLOWS]->(friend:User)-[:FOLLOWS]->(recommended:User)
              WHERE NOT (me)-[:FOLLOWS]->(recommended) AND me <> recommended
@@ -181,7 +181,7 @@ const getRecommendations = async (req, res) => {
             totalPosts: record.get('totalPosts')?.toNumber?.() ?? record.get('totalPosts')
         }));
 
-        // Estratégia 2: Usuários populares que você não segue
+        
         const popularUsersResult = await neogma.queryRunner.run(
             `MATCH (me:User {id: $id})
              MATCH (popular:User)
@@ -214,7 +214,7 @@ const getRecommendations = async (req, res) => {
             totalPosts: record.get('totalPosts')?.toNumber?.() ?? record.get('totalPosts')
         }));
 
-        // Estratégia 3: Usuários ativos (postam muito) que você não segue
+        
         const activeUsersResult = await neogma.queryRunner.run(
             `MATCH (me:User {id: $id})
              MATCH (active:User)-[:POSTED]->(post:Post)
@@ -246,7 +246,7 @@ const getRecommendations = async (req, res) => {
             totalPosts: record.get('totalPosts')?.toNumber?.() ?? record.get('totalPosts')
         }));
 
-        // Combina todas as recomendações e remove duplicatas
+        
         const allRecommendations = [...friendsOfFriends, ...popularUsers, ...activeUsers];
         const uniqueRecommendations = [];
         const seenIds = new Set();
@@ -258,10 +258,10 @@ const getRecommendations = async (req, res) => {
             }
         }
 
-        // Ordena por score (amigos em comum têm prioridade)
+        
         uniqueRecommendations.sort((a, b) => b.score - a.score);
 
-        // Retorna top 10
+        
         const topRecommendations = uniqueRecommendations.slice(0, 10);
 
         return res.status(200).send({
@@ -273,7 +273,7 @@ const getRecommendations = async (req, res) => {
     }
 };
 
-// Posts de um usuário específico com contagens de likes e comentários
+
 const getUserPosts = async (req, res) => {
     try {
         const { id } = req.params;
@@ -363,7 +363,7 @@ const getFollowing = async (req, res) => {
 
 const searchUsers = async (req, res) => {
     try {
-        const { q, userId } = req.query; // q = query de busca, userId = usuário logado
+        const { q, userId } = req.query; 
         
         if (!q || q.trim().length === 0) {
             return res.status(400).send({ message: 'Query de busca é obrigatória' });
@@ -372,7 +372,7 @@ const searchUsers = async (req, res) => {
         const neogma = getNeogma();
         const searchTerm = q.toLowerCase();
         
-        // Busca usuários por username ou email (case-insensitive)
+        
         const result = await neogma.queryRunner.run(
             `MATCH (u:User)
              WHERE toLower(u.username) CONTAINS $searchTerm 
