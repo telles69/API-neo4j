@@ -65,7 +65,39 @@ const getPost = async (req, res) => {
 
 const getAll = async (req, res) => {
     try {
-        const posts = await Post.findMany({});
+        const { userId } = req.query; // ID do usuário logado (opcional)
+        const neogma = getNeogma();
+        
+        // Busca posts com informações do autor via relacionamento POSTED
+        const result = await neogma.queryRunner.run(
+            `MATCH (u:User)-[:POSTED]->(p:Post)
+             OPTIONAL MATCH (p)<-[:LIKES]-(lu:User)
+             OPTIONAL MATCH (p)<-[:ON]-(c:Comment)
+             ${userId ? 'OPTIONAL MATCH (currentUser:User {id: $userId})-[follows:FOLLOWS]->(u)' : ''}
+             RETURN p.id AS id, p.content AS content, p.createdAt AS createdAt, p.updatedAt AS updatedAt,
+                    u.id AS userId, u.username AS username, u.email AS email,
+                    count(DISTINCT lu) AS likes, count(DISTINCT c) AS comments
+                    ${userId ? ', exists((currentUser)-[:FOLLOWS]->(u)) AS isFollowing' : ''}
+             ORDER BY p.createdAt DESC`,
+            userId ? { userId } : {}
+        );
+
+        const posts = result.records.map(record => ({
+            id: record.get('id'),
+            content: record.get('content'),
+            createdAt: record.get('createdAt'),
+            updatedAt: record.get('updatedAt'),
+            userId: record.get('userId'),
+            author: {
+                id: record.get('userId'),
+                username: record.get('username'),
+                email: record.get('email')
+            },
+            likes: record.get('likes')?.toNumber?.() ?? record.get('likes'),
+            comments: record.get('comments')?.toNumber?.() ?? record.get('comments'),
+            isFollowing: userId ? record.get('isFollowing') : false
+        }));
+
         return res.status(200).send({
             message: 'Lista de posts',
             data: posts
@@ -94,13 +126,30 @@ const likePost = async (req, res) => {
             return res.status(404).send({ message: 'Post ou Usuário não encontrado' });
         }
 
-        await neogma.queryRunner.run(
-            `MATCH (u:User {id: $userId}), (p:Post {id: $id})
-             MERGE (u)-[:LIKES]->(p)`,
+        // Verifica se já existe o relacionamento LIKES
+        const checkResult = await neogma.queryRunner.run(
+            `MATCH (u:User {id: $userId})-[r:LIKES]->(p:Post {id: $id})
+             RETURN r`,
             { userId, id }
         );
 
-        return res.status(200).send({ message: 'Post curtido com sucesso' });
+        if (checkResult.records.length > 0) {
+            // Se já curtiu, remove o like
+            await neogma.queryRunner.run(
+                `MATCH (u:User {id: $userId})-[r:LIKES]->(p:Post {id: $id})
+                 DELETE r`,
+                { userId, id }
+            );
+            return res.status(200).send({ message: 'Like removido com sucesso', liked: false });
+        } else {
+            // Se não curtiu, adiciona o like
+            await neogma.queryRunner.run(
+                `MATCH (u:User {id: $userId}), (p:Post {id: $id})
+                 MERGE (u)-[:LIKES]->(p)`,
+                { userId, id }
+            );
+            return res.status(200).send({ message: 'Post curtido com sucesso', liked: true });
+        }
     } catch (error) {
         return res.status(500).send({ message: error.message });
     }
